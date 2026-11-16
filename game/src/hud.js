@@ -6,28 +6,29 @@ import { STATE } from './game.js';
 const P = CONFIG.palette;
 const FONT = '"Trebuchet MS", "Segoe UI", sans-serif';
 
-/** A small framed label with a value in it, used for the two abilities. */
-function abilityBox(context, x, y, key, label, ready, ratio) {
+/** One ability, in its own frame, with its state read from its light. */
+function abilityBox(context, x, y, key, label, ready, ratio, accent) {
   const width = 168;
   const height = 34;
-  context.strokeStyle = ready ? P.playerCore : 'rgba(141, 127, 174, 0.35)';
+  const lit = accent || P.playerCore;
+  context.strokeStyle = ready ? lit : 'rgba(141, 127, 174, 0.35)';
   context.lineWidth = 1.5;
   context.strokeRect(x + 0.5, y + 0.5, width, height);
-  context.fillStyle = 'rgba(255, 255, 255, 0.05)';
+  context.fillStyle = ready ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.03)';
   context.fillRect(x + 1, y + 1, width - 2, height - 2);
 
   context.fillStyle = ready ? P.ink : P.dim;
   context.font = `700 14px ${FONT}`;
   context.fillText(key, x + 12, y + 22);
 
-  context.fillStyle = ready ? P.playerCore : P.dim;
+  context.fillStyle = ready ? lit : P.dim;
   context.font = `600 13px ${FONT}`;
   context.fillText(label, x + 68, y + 22);
 
   // The charge the ability is waiting on, as a thin line under the frame.
   context.fillStyle = 'rgba(255, 255, 255, 0.12)';
   context.fillRect(x + 1, y + height + 2, width - 2, 3);
-  context.fillStyle = ready ? P.playerCore : P.dim;
+  context.fillStyle = ready ? lit : P.dim;
   context.fillRect(x + 1, y + height + 2, (width - 2) * ratio, 3);
 }
 
@@ -95,6 +96,12 @@ export function drawHud(context, game) {
   context.font = `600 13px ${FONT}`;
   context.fillText('WICK', 28, 112);
 
+  // Which night this is, so the sheet of screens reads as one run of the
+  // same game rather than a set of unrelated moments.
+  context.fillStyle = 'rgba(141, 127, 174, 0.85)';
+  context.font = `700 15px ${FONT}`;
+  context.fillText(`NIGHT ${game.night === 2 ? 'TWO' : 'ONE'}`, 28, 138);
+
   // Top right: the wave, and how much of it is left.
   context.textAlign = 'right';
   context.fillStyle = P.ink;
@@ -104,6 +111,24 @@ export function drawHud(context, game) {
   context.font = `600 13px ${FONT}`;
   const left = Math.max(0, game.waveLength - game.waveClock);
   context.fillText(`NIGHT HOLDS ${Math.ceil(left)}s`, width - 28, 54);
+
+  // The wave pips, the same marks the end screens use, so how far the run
+  // has got is one glance.
+  const pipGap = 16;
+  const pipRadius = 5;
+  const pipX = width - 28 - (CONFIG.waves.count - 1) * pipGap;
+  for (let index = 0; index < CONFIG.waves.count; index += 1) {
+    context.beginPath();
+    context.arc(pipX + index * pipGap, 74, pipRadius, 0, Math.PI * 2);
+    if (index < Math.max(1, game.wave)) {
+      context.fillStyle = P.ink;
+      context.fill();
+    } else {
+      context.strokeStyle = 'rgba(141, 127, 174, 0.7)';
+      context.lineWidth = 1.5;
+      context.stroke();
+    }
+  }
   context.textAlign = 'left';
 
   // Top centre: the combo, when there is one.
@@ -139,9 +164,10 @@ export function drawHud(context, game) {
 
   // Bottom left, under the bar: the two abilities, each in its own frame.
   const burstReady = game.burstCooldown <= 0 && game.player.charge >= CONFIG.core.burstCost;
+  const shieldUp = game.shieldTime > 0;
   const shieldReady = game.shieldCooldown <= 0 && game.player.charge >= CONFIG.shield.cost;
-  abilityBox(context, barX, barY + 30, 'SPACE', burstReady ? 'BURST READY' : 'CHARGING', burstReady, game.player.charge / CONFIG.core.maxCharge);
-  abilityBox(context, barX + 184, barY + 30, 'SHIFT', shieldReady ? 'SHIELD READY' : 'COOLING', shieldReady, 1 - game.shieldCooldown / CONFIG.shield.cooldown);
+  abilityBox(context, barX, barY + 30, 'SPACE', burstReady ? 'BURST READY' : 'COOLDOWN', burstReady, game.player.charge / CONFIG.core.maxCharge);
+  abilityBox(context, barX + 184, barY + 30, 'SHIFT', shieldUp ? 'SHIELD UP' : shieldReady ? 'SHIELD READY' : 'COOLDOWN', shieldReady || shieldUp, 1 - game.shieldCooldown / CONFIG.shield.cooldown, P.shield);
 
   // Bottom right: the night so far, in words.
   context.textAlign = 'right';

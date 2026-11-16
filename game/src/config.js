@@ -2,15 +2,18 @@
 export const CONFIG = {
   world: { width: 1280, height: 720 },
   player: {
-    radius: 19, accel: 2200, maxSpeed: 330, drag: 0.86,
+    radius: 20, accel: 2200, maxSpeed: 330, drag: 0.86,
     health: 3, maxHealth: 3, invulnAfterHit: 1.7, hitKnockback: 260,
   },
   ember: {
     bobAmp: 48, bobRate: 1.9, chaseTurn: 1.6, spawnFade: 0.45, lungeSpeed: 1.45,
     types: {
-      cinder: { radius: 11, speed: 212, hp: 1, score: 10, splitInto: 0, tint: 0xff9a3c },
-      coal: { radius: 20, speed: 138, hp: 3, score: 34, splitInto: 2, tint: 0xd8342f },
-      spark: { radius: 7, speed: 300, hp: 1, score: 16, splitInto: 0, tint: 0xffd166 },
+      // The threats are cold: violet and magenta. The wick is the only warm
+      // thing on the field, so the eye finds it and reads it as the threat
+      // in one glance.
+      cinder: { radius: 11, speed: 212, hp: 1, score: 10, splitInto: 0, tint: 0xb06cf0 },
+      coal: { radius: 20, speed: 138, hp: 3, score: 34, splitInto: 2, tint: 0xe0457b },
+      spark: { radius: 7, speed: 300, hp: 1, score: 16, splitInto: 0, tint: 0x8f6fff },
     },
   },
   mote: {
@@ -18,12 +21,12 @@ export const CONFIG = {
     driftSpeed: 26, value: 5, chargeGain: 9,
     beacon: { radius: 9, value: 25, chargeGain: 60, lifetime: 9 },
   },
-  spark: { radius: 6, life: 0.45, speed: 250, drag: 0.9 },
+  spark: { radius: 9, life: 0.85, speed: 250, drag: 0.9 },
   core: {
     maxCharge: 100, chargePerSecond: 17, burstRadius: 230, burstCost: 30,
     burstCooldown: 0.45, burstLife: 0.42, pushSpeed: 620,
   },
-  shield: { radius: 34, cooldown: 1.4, duration: 0.55, cost: 16 },
+  shield: { radius: 46, cooldown: 1.4, duration: 0.55, cost: 16 },
   score: { comboStep: 0.34, comboMax: 6, comboWindow: 2.8 },
   waves: {
     count: 8, bannerTime: 2.1, nextWaveDelay: 1.5,
@@ -37,14 +40,15 @@ export const CONFIG = {
     void: '#0a0713',
     voidDeep: '#05030a',
     haze: '#171033',
-    emberCore: '#fff3d6',
-    emberMid: '#ff9a3c',
-    emberEdge: '#d8342f',
-    playerCore: '#8ff6ff',
-    playerEdge: '#1d7fa8',
+    // The wick's own light: hot and warm, the one warm thing on the field.
+    emberCore: '#fff1cf',
+    emberMid: '#ffb347',
+    emberEdge: '#e0457b',
+    playerCore: '#ffd88a',
+    playerEdge: '#c2410c',
     mote: '#ffe27a',
-    beacon: '#b6ff8f',
-    spark: '#ffd166',
+    beacon: '#c9a6ff',
+    spark: '#b6f0ff',
     shield: '#6ee7ff',
     danger: '#ff4d6d',
     ink: '#f4e9ff',

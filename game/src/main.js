@@ -31,13 +31,17 @@ const input = new Input();
 input.attach(window);
 
 const sound = new Sound();
-// The night's seed, chosen so the first frames a player sees are a good night.
-const game = new Game(new Rng(31337));
+// The night's seed, chosen so the first frames a player sees are a good
+// night. A seed in the query string overrides it, so a screenshot can ask
+// for a particular night.
+const seed = Number(new URLSearchParams(window.location.search).get('seed')) || 31337;
+const game = new Game(new Rng(seed));
 
 /** Announce the state of the night to a screen reader. */
 function announce() {
   if (!status) return;
   if (game.state === STATE.TITLE) status.textContent = 'Emberwake title screen. Press space to begin the night.';
+  else if (game.state === STATE.CHOOSING) status.textContent = `Choose a boon. ${game.offers.map((boon, index) => `${index + 1}: ${boon.name}`).join(', ')}.`;
   else if (game.state === STATE.GAMEOVER) status.textContent = `The wick went out. Score ${game.score}. Press R to play again.`;
   else if (game.state === STATE.VICTORY) status.textContent = `Dawn breaks. Score ${game.score}. Press R for another night.`;
   else status.textContent = `Wave ${game.wave} of ${CONFIG.waves.count}. Score ${game.score}. ${game.player.health} lives left.`;
@@ -45,9 +49,16 @@ function announce() {
 
 /** Draw one frame of the night. */
 function render() {
+  // On the title card the night has not begun: there is no wick on the field
+  // and no readouts to report, only the card itself over the dark.
+  if (game.state === STATE.TITLE) {
+    drawScene(context, game, { hidePlayer: true });
+    drawScreen(context, game);
+    return;
+  }
   drawScene(context, game);
   // The HUD belongs to a night in progress; the end screens speak for themselves.
-  if (game.state === STATE.PLAYING || game.state === STATE.WAVE_BREAK || game.state === STATE.TITLE) {
+  if (game.state === STATE.PLAYING || game.state === STATE.WAVE_BREAK) {
     drawHud(context, game);
   }
   drawScreen(context, game);
@@ -78,6 +89,12 @@ if (shot) {
     previousBurstCooldown = game.burstCooldown;
     previousHealth = game.player.health;
     previousScore = game.score;
+    // The choice between waves: the number keys take one of the offers.
+    if (game.state === STATE.CHOOSING) {
+      if (input.hit('Digit1') || input.hit('Numpad1')) game.chooseBoon(0);
+      else if (input.hit('Digit2') || input.hit('Numpad2')) game.chooseBoon(1);
+      else if (input.hit('Digit3') || input.hit('Numpad3')) game.chooseBoon(2);
+    }
     render();
     announce();
     input.endFrame();

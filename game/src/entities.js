@@ -74,14 +74,31 @@ export function makeSpark(x, y, angle, speed, tint) {
 }
 
 /** The expanding ring a core burst throws out. */
-export function makeBurst(x, y) {
+export function makeBurst(x, y, scale = 1) {
   return {
     x,
     y,
     radius: 0,
-    max: CONFIG.core.burstRadius,
+    max: CONFIG.core.burstRadius * scale,
     life: CONFIG.core.burstLife,
     maxLife: CONFIG.core.burstLife,
+    alive: true,
+  };
+}
+
+/**
+ * The flash an ember leaves behind when it is snuffed: a bright disc that
+ * collapses to nothing. Without it a kill is invisible.
+ */
+export function makeFlash(x, y, tint) {
+  return {
+    x,
+    y,
+    radius: 30,
+    max: 30,
+    life: 0.3,
+    maxLife: 0.3,
+    tint,
     alive: true,
   };
 }

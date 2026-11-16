@@ -1,12 +1,14 @@
 // The rule layer of Emberwake: what the night does to the player, and what the
 // player does back. The renderer only draws the state this file leaves behind.
 import { CONFIG } from './config.js';
-import { makeEmber, makeMote, makeSpark, makeBurst, makePlayer, wavePlan } from './entities.js';
+import { makeEmber, makeMote, makeSpark, makeBurst, makeFlash, makePlayer, wavePlan } from './entities.js';
+import { offerBoons, takeBoon } from './boons.js';
 
 const STATE = {
   TITLE: 'title',
   PLAYING: 'playing',
   WAVE_BREAK: 'break',
+  CHOOSING: 'choosing',
   GAMEOVER: 'gameover',
   VICTORY: 'victory',
 };
@@ -15,6 +17,7 @@ const STATE = {
 export class Game {
   constructor(rng) {
     this.rng = rng;
+    this.seed = rng.state;
     this.reset();
   }
 
@@ -26,6 +29,7 @@ export class Game {
     this.motes = [];
     this.sparks = [];
     this.bursts = [];
+    this.flashes = [];
     this.score = 0;
     this.combo = 0;
     this.comboTimer = 0;
@@ -47,6 +51,25 @@ export class Game {
     this.time = 0;
     this.stats = { embers: 0, motes: 0, bestCombo: 0, waves: 0 };
     this.message = 'Hold the light until dawn.';
+    // Which night of the campaign this is. The title card starts the first.
+    this.night = 1;
+    // The boons the wick carries, and the ones it has been offered.
+    this.boons = {
+      coreRadius: 1,
+      shieldCooldown: 1,
+      chargeRate: 1,
+      pickupRange: 1,
+      burstCost: 1,
+      emberSpeed: 1,
+      emberScore: 1,
+      accel: 1,
+    };
+    this.takenBoons = [];
+    this.boonsChosen = [];
+    this.offers = [];
+    // The random stream starts over too, so a night replayed is the same
+    // night, which is what the staged screenshots depend on.
+    this.rng.state = this.seed;
   }
 
   /** Begin the night: wave one, and the player at the centre of the dark. */
@@ -99,9 +122,19 @@ export class Game {
   /** Fire the core burst: a ring that snuffs embers and shoves the rest. */
   tryBurst() {
     if (this.burstCooldown > 0) return false;
-    if (!this.spend(CONFIG.core.burstCost)) return false;
+    if (!this.spend(CONFIG.core.burstCost * this.boons.burstCost)) return false;
     this.burstCooldown = CONFIG.core.burstCooldown;
-    this.bursts.push(makeBurst(this.player.x, this.player.y));
+    this.bursts.push(makeBurst(this.player.x, this.player.y, this.boons.coreRadius));
+    // The wave throws light of its own, so the burst reads as something
+    // leaving the wick rather than a circle drawn around it. The angles are
+    // spread unevenly on purpose: evenly spaced sparks line up into a ring
+    // of dots that reads as an orbit rather than as an explosion.
+    for (let index = 0; index < 11; index += 1) {
+      const angle = (index / 11) * Math.PI * 2 + this.rng.range(-0.55, 0.55);
+      this.sparks.push(
+        makeSpark(this.player.x, this.player.y, angle, this.rng.range(210, 520), 0xbdf7ff),
+      );
+    }
     this.shake = Math.max(this.shake, 6);
     this.flash = Math.max(this.flash, 0.5);
     return true;
@@ -111,8 +144,36 @@ export class Game {
   tryShield() {
     if (this.shieldCooldown > 0) return false;
     if (!this.spend(CONFIG.shield.cost)) return false;
-    this.shieldCooldown = CONFIG.shield.cooldown;
+    this.shieldCooldown = CONFIG.shield.cooldown * this.boons.shieldCooldown;
     this.shieldTime = CONFIG.shield.duration;
+    return true;
+  }
+
+  /**
+   * Offer three boons and wait for the player to take one. The night is
+   * held until a choice is made.
+   */
+  offerChoice() {
+    this.offers = offerBoons(this.takenBoons, this.rng);
+    if (this.offers.length === 0) {
+      this.state = STATE.PLAYING;
+      this.beginWave(this.wave + 1);
+      return;
+    }
+    this.state = STATE.CHOOSING;
+    this.banner = 'THE NIGHT GIVES YOU A CHOICE';
+    this.bannerTimer = CONFIG.waves.bannerTime;
+    this.message = 'Pick one. The next wave waits.';
+  }
+
+  /** Take one of the offered boons, and the next wave begins. */
+  chooseBoon(index) {
+    if (this.state !== STATE.CHOOSING) return false;
+    const boon = this.offers[index];
+    takeBoon(this, boon);
+    this.offers = [];
+    this.state = STATE.PLAYING;
+    this.beginWave(this.wave + 1);
     return true;
   }
 
@@ -154,8 +215,9 @@ export class Game {
   snuffEmber(ember, index, split = true) {
     ember.alive = false;
     this.embers.splice(index, 1);
-    const gained = this.addScore(ember.score);
+    const gained = this.addScore(ember.score * this.boons.emberScore);
     const tint = ember.tint;
+    this.flashes.push(makeFlash(ember.x, ember.y, tint));
     for (let i = 0; i < 7; i += 1) {
       this.sparks.push(makeSpark(ember.x, ember.y, this.rng.range(0, Math.PI * 2), this.rng.range(90, 280), tint));
     }
@@ -192,6 +254,14 @@ export class Game {
       if (input.hit('Space') || input.hit('Enter')) this.start();
       return;
     }
+    if (this.state === STATE.CHOOSING) {
+      // The choice is answered by the player; the scripted nights answer it
+      // from the input they are given, so a night never stalls here.
+      if (input.hit('Digit1') || input.hit('Numpad1')) this.chooseBoon(0);
+      else if (input.hit('Digit2') || input.hit('Numpad2')) this.chooseBoon(1);
+      else if (input.hit('Digit3') || input.hit('Numpad3')) this.chooseBoon(2);
+      return;
+    }
     if (this.state === STATE.GAMEOVER || this.state === STATE.VICTORY) {
       if (input.hit('KeyR') || input.hit('Space') || input.hit('Enter')) this.start();
       return;
@@ -202,6 +272,7 @@ export class Game {
     this.stepEmbers(dt);
     this.stepMotes(dt);
     this.stepSparks(dt);
+    this.stepFlashes(dt);
     this.stepBursts(dt);
     this.stepWave(dt);
     this.stepBreak(dt);
@@ -211,8 +282,8 @@ export class Game {
   stepPlayer(dt, input) {
     const player = this.player;
     const move = input.moveVector();
-    player.vx += move.x * CONFIG.player.accel * dt;
-    player.vy += move.y * CONFIG.player.accel * dt;
+    player.vx += move.x * CONFIG.player.accel * this.boons.accel * dt;
+    player.vy += move.y * CONFIG.player.accel * this.boons.accel * dt;
     const drag = Math.pow(CONFIG.player.drag, dt * 60);
     player.vx *= drag;
     player.vy *= drag;
@@ -230,7 +301,10 @@ export class Game {
     if (player.y > CONFIG.world.height - margin) { player.y = CONFIG.world.height - margin; player.vy = -Math.abs(player.vy) * 0.4; }
     if (player.invuln > 0) player.invuln = Math.max(0, player.invuln - dt);
     player.bob += dt * 3.1;
-    player.charge = Math.min(CONFIG.core.maxCharge, player.charge + CONFIG.core.chargePerSecond * dt);
+    player.charge = Math.min(
+      CONFIG.core.maxCharge,
+      player.charge + CONFIG.core.chargePerSecond * this.boons.chargeRate * dt,
+    );
     if (move.x !== 0 || move.y !== 0) player.facing = Math.atan2(move.y, move.x);
     if (input.hit('Space')) this.tryBurst();
     if (input.hit('ShiftLeft') || input.hit('ShiftRight') || input.hit('KeyF')) this.tryShield();
@@ -305,8 +379,8 @@ export class Game {
       // dangerous one, and the player has to burst it before it lands.
       const distance = Math.hypot(player.x - ember.x, player.y - ember.y);
       const lunge = distance < 240 ? CONFIG.ember.lungeSpeed : 1;
-      ember.vx = Math.cos(angle + wobble) * ember.speed * lunge;
-      ember.vy = Math.sin(angle + wobble) * ember.speed * lunge;
+      ember.vx = Math.cos(angle + wobble) * ember.speed * lunge * this.boons.emberSpeed;
+      ember.vy = Math.sin(angle + wobble) * ember.speed * lunge * this.boons.emberSpeed;
       ember.x += ember.vx * dt;
       ember.y += ember.vy * dt;
 
@@ -367,7 +441,7 @@ export class Game {
         mote.vx += ((player.x - mote.x) / distance) * pull * dt;
         mote.vy += ((player.y - mote.y) / distance) * pull * dt;
       }
-      if (distance < CONFIG.mote.pickupRadius + mote.radius) {
+      if (distance < (CONFIG.mote.pickupRadius + mote.radius) * this.boons.pickupRange) {
         this.collectMote(mote);
         mote.alive = false;
         this.motes.splice(index, 1);
@@ -392,6 +466,19 @@ export class Game {
       if (spark.life <= 0) {
         spark.alive = false;
         this.sparks.splice(index, 1);
+      }
+    }
+  }
+
+  /** The flashes collapse. */
+  stepFlashes(dt) {
+    for (let index = this.flashes.length - 1; index >= 0; index -= 1) {
+      const flash = this.flashes[index];
+      flash.life -= dt;
+      flash.radius = flash.max * Math.max(0, flash.life / flash.maxLife);
+      if (flash.life <= 0) {
+        flash.alive = false;
+        this.flashes.splice(index, 1);
       }
     }
   }
@@ -424,7 +511,9 @@ export class Game {
     }
   }
 
-  /** The wave clock: spawn, hold, and the next wave. */
+  /**
+   * The wave clock: spawn, hold, and the next wave.
+   */
   stepWave(dt) {
     if (this.state !== STATE.PLAYING) return;
     this.waveClock += dt;
@@ -446,13 +535,15 @@ export class Game {
     this.message = `Wave ${this.wave} held.`;
   }
 
-  /** Keep the wave clock running during the break between waves. */
+  /**
+   * The wave clock: keep the wave running and hand over to the next one.
+   */
   stepBreak(dt) {
     if (this.state !== STATE.WAVE_BREAK) return;
     this.waveTimer -= dt;
     if (this.waveTimer <= 0) {
-      this.state = STATE.PLAYING;
-      this.beginWave(this.wave + 1);
+      // The night pauses for a choice before the next wave.
+      this.offerChoice();
     }
   }
 }

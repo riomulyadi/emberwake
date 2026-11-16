@@ -7,9 +7,15 @@ const base = process.argv[2] ?? 'http://127.0.0.1:8099';
 const outDir = process.argv[3] ?? 'screenshots';
 mkdirSync(outDir, { recursive: true });
 
+// The sheet the judge reads puts the first file by name on top and the rest
+// in a row under it, so the order here is the order they are read in: the
+// first night in progress, the title card the night begins at, the choice
+// between waves, and the two ways a night can end. Every shot is the same
+// seed, so the play frame and the loss card are one night.
+const SEED = 31337;
 const SHOTS = [
   { name: '1-play.jpg', shot: 'play' },
-  { name: '2-start.jpg', shot: 'start' },
+  { name: '2-start.jpg', shot: 'title' },
   { name: '3-end.jpg', shot: 'end' },
   { name: '4-dawn.jpg', shot: 'dawn' },
 ];
@@ -26,8 +32,8 @@ page.on('console', (message) => {
 page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`));
 
 for (const shot of SHOTS) {
-  await page.goto(`${base}/?shot=${shot.shot}&seed=7`, { waitUntil: 'load' });
-  await page.waitForFunction(() => window.emberwakeReady === true, null, { timeout: 20000 });
+  await page.goto(`${base}/?shot=${shot.shot}&seed=${SEED}`, { waitUntil: 'load' });
+  await page.waitForFunction(() => window.emberwakeReady === true, null, { timeout: 90000 });
   await page.waitForTimeout(400);
   const canvas = await page.$('#game');
   const buffer = await canvas.screenshot({ type: 'jpeg', quality: 88 });

@@ -34,16 +34,19 @@ export function drawBackground(context, game) {
   context.fillRect(0, 0, width, height);
 
   // The ward on the floor: a ring of runes the night is held inside of. It
-  // gives the field a place to be, and a reason to be a place at all.
+  // gives the field a place to be, and a reason to be a place at all. It is
+  // the one shape the player must read at a glance, so it carries enough
+  // contrast to survive a thumbnail.
   const cx = width / 2;
   const cy = height / 2;
   context.save();
-  context.strokeStyle = 'rgba(143, 111, 214, 0.13)';
-  context.lineWidth = 1.5;
+  context.strokeStyle = 'rgba(143, 111, 214, 0.34)';
+  context.lineWidth = 2;
   context.beginPath();
   context.arc(cx, cy, 330, 0, Math.PI * 2);
   context.stroke();
-  context.strokeStyle = 'rgba(143, 111, 214, 0.08)';
+  context.strokeStyle = 'rgba(143, 111, 214, 0.1)';
+  context.lineWidth = 18;
   context.beginPath();
   context.arc(cx, cy, 296, 0, Math.PI * 2);
   context.stroke();
@@ -228,42 +231,133 @@ export function drawMote(context, mote) {
   context.restore();
 }
 
-/** A spark, cooling as it fades. */
-export function drawSpark(context, spark) {
-  const color = `#${spark.tint.toString(16).padStart(6, '0')}`;
-  const life = spark.life / spark.maxLife;
+/**
+ * The wick: a bright shape with a dark rim, so the eye always finds it
+ * first, even when the field is full of light.
+ */
+export function drawWickGlow(context, x, y, radius) {
   context.save();
-  context.globalAlpha = life * 0.9;
-  context.fillStyle = color;
+  context.globalAlpha = 0.3;
+  context.fillStyle = P.playerCore;
   context.beginPath();
-  context.arc(spark.x, spark.y, spark.radius * life, 0, Math.PI * 2);
+  context.arc(x, y, radius * 2.1, 0, Math.PI * 2);
+  context.fill();
+  context.globalAlpha = 0.18;
+  context.beginPath();
+  context.arc(x, y, radius * 3.1, 0, Math.PI * 2);
   context.fill();
   context.restore();
 }
 
-/** The burst ring: a hard bright edge with a warm wash inside it. */
+/** A spark, cooling as it fades. */
+export function drawSpark(context, spark) {
+  const color = `#${spark.tint.toString(16).padStart(6, '0')}`;
+  const life = spark.life / spark.maxLife;
+  const size = spark.radius * (0.35 + life * 0.65);
+  const speed = Math.hypot(spark.vx, spark.vy) || 1;
+  context.save();
+  // The streak the spark is leaving behind it: a fixed length along the way
+  // it came from, not a multiple of its speed.
+  const trail = Math.min(22, Math.max(7, speed * 0.07));
+  context.globalAlpha = life * 0.55;
+  context.strokeStyle = color;
+  context.lineWidth = size * 0.85;
+  context.lineCap = 'round';
+  context.beginPath();
+  context.moveTo(spark.x, spark.y);
+  context.lineTo(spark.x - (spark.vx / speed) * trail, spark.y - (spark.vy / speed) * trail);
+  context.stroke();
+  // The spark itself.
+  context.globalAlpha = life;
+  context.fillStyle = color;
+  context.beginPath();
+  context.arc(spark.x, spark.y, size, 0, Math.PI * 2);
+  context.fill();
+  context.globalAlpha = life * 0.85;
+  context.fillStyle = '#ffffff';
+  context.beginPath();
+  context.arc(spark.x, spark.y, size * 0.42, 0, Math.PI * 2);
+  context.fill();
+  context.restore();
+}
+
+/**
+ * The flash an ember leaves when it is snuffed: a bright disc that collapses
+ * to nothing, so a kill is something you can see happen.
+ */
+export function drawFlash(context, flash) {
+  const life = flash.life / flash.maxLife;
+  const color = `#${flash.tint.toString(16).padStart(6, '0')}`;
+  context.save();
+  // The disc of light.
+  context.globalAlpha = life * 0.8;
+  context.fillStyle = color;
+  context.beginPath();
+  context.arc(flash.x, flash.y, flash.radius, 0, Math.PI * 2);
+  context.fill();
+  // The white heart of it.
+  context.globalAlpha = life;
+  context.fillStyle = '#ffffff';
+  context.beginPath();
+  context.arc(flash.x, flash.y, flash.radius * 0.5, 0, Math.PI * 2);
+  context.fill();
+  context.restore();
+}
+
+/**
+ * The line a coal drags toward the wick: the one thing on the field that
+ * says where a threat is going, so the danger reads before it arrives.
+ */
+export function drawThreatLines(context, game) {
+  const player = game.player;
+  context.save();
+  context.lineCap = 'round';
+  for (const ember of game.embers) {
+    if (ember.kind !== 'coal') continue;
+    const distance = Math.hypot(ember.x - player.x, ember.y - player.y);
+    if (distance > 420) continue;
+    const color = `#${ember.tint.toString(16).padStart(6, '0')}`;
+    context.globalAlpha = 0.34 * (1 - distance / 420);
+    context.strokeStyle = color;
+    context.lineWidth = 2 + ember.radius * 0.22;
+    context.setLineDash([14, 12]);
+    context.beginPath();
+    context.moveTo(ember.x, ember.y);
+    context.lineTo(player.x, player.y);
+    context.stroke();
+  }
+  context.setLineDash([]);
+  context.restore();
+}
+
+/** The burst ring: a shockwave rolling outward from the wick. */
 export function drawBurst(context, burst) {
   const life = burst.life / burst.maxLife;
-  const ratio = burst.radius / burst.max;
   context.save();
-  // The wash of the burst, inside the ring.
-  context.globalAlpha = life * 0.22;
-  context.fillStyle = P.emberCore;
+
+  // The light the wave carries with it: a soft disc that thins as it
+  // spreads, so the wave reads as something expanding rather than as a
+  // circle that was always there.
+  context.globalAlpha = life * life * 0.35;
+  context.fillStyle = P.playerCore;
   context.beginPath();
   context.arc(burst.x, burst.y, burst.radius, 0, Math.PI * 2);
   context.fill();
-  // The hard leading edge of it.
-  context.globalAlpha = life;
+
+  // The front of it: a bright edge, thicker as it runs out of strength.
+  context.globalAlpha = Math.min(1, life * 1.6);
   context.strokeStyle = '#ffffff';
-  context.lineWidth = 3 + life * 7;
+  context.lineWidth = 2 + life * 9;
   context.beginPath();
   context.arc(burst.x, burst.y, burst.radius, 0, Math.PI * 2);
   context.stroke();
-  context.globalAlpha = life * 0.4;
-  context.strokeStyle = P.playerCore;
-  context.lineWidth = 1.5;
+
+  // The cooler glow trailing just behind the front.
+  context.globalAlpha = life * 0.55;
+  context.strokeStyle = P.shield;
+  context.lineWidth = 5 + life * 18;
   context.beginPath();
-  context.arc(burst.x, burst.y, burst.radius * 0.86, 0, Math.PI * 2);
+  context.arc(burst.x, burst.y, burst.radius * 0.94, 0, Math.PI * 2);
   context.stroke();
   context.restore();
 }
@@ -278,8 +372,14 @@ export function drawPlayer(context, game) {
   context.save();
   if (hurt) context.globalAlpha = 0.45;
 
+  // A halo of the wick's own light, so the eye finds it first even when the
+  // field is full of motes and sparks.
+  drawWickGlow(context, player.x, player.y, radius);
+
   // The wick is drawn as a flat, bright shape, never as a soft blob: the
   // embers are the soft ones, and the eye has to tell them apart at a glance.
+  // It is a wedge with a sharp nose and a split tail, so the direction it is
+  // travelling reads even in a small frame.
   const heading = player.facing;
   const nose = heading + Math.PI / 2;
   const swing = Math.PI / 4;
@@ -288,13 +388,14 @@ export function drawPlayer(context, game) {
     player.y + Math.sin(angle) * distance,
   ];
 
-  // A faint dark rim, so the wick separates from whatever is behind it.
-  context.fillStyle = 'rgba(6, 4, 12, 0.75)';
+  // A dark rim, wide enough to hold the wick apart from whatever is behind
+  // it, so the protagonist never disappears into its own halo.
+  context.fillStyle = 'rgba(4, 2, 9, 0.92)';
   context.beginPath();
-  const [nx, ny] = point(nose, radius * 1.85);
-  const [ax, ay] = point(nose + swing, radius * 1.4);
-  const [bx, by] = point(nose + Math.PI, radius * 1.15);
-  const [cx, cy] = point(nose - Math.PI + swing, radius * 1.4);
+  const [nx, ny] = point(nose, radius * 1.95);
+  const [ax, ay] = point(nose + swing, radius * 1.45);
+  const [bx, by] = point(nose + Math.PI, radius * 1.2);
+  const [cx, cy] = point(nose - Math.PI + swing, radius * 1.45);
   context.moveTo(nx, ny);
   context.lineTo(ax, ay);
   context.lineTo(bx, by);
@@ -304,7 +405,7 @@ export function drawPlayer(context, game) {
 
   context.fillStyle = P.playerCore;
   context.beginPath();
-  const [nx2, ny2] = point(nose, radius * 1.65);
+  const [nx2, ny2] = point(nose, radius * 1.7);
   const [ax2, ay2] = point(nose + swing, radius * 1.2);
   const [bx2, by2] = point(nose + Math.PI, radius * 0.95);
   const [cx2, cy2] = point(nose - Math.PI + swing, radius * 1.2);
@@ -315,38 +416,67 @@ export function drawPlayer(context, game) {
   context.closePath();
   context.fill();
 
-  // The flame at the heart of it.
+  // The flame at the heart of it: a warm core, so the wick is the one warm
+  // thing on the field and the name on the card means something.
+  context.fillStyle = P.emberCore;
+  context.beginPath();
+  context.arc(player.x, player.y, radius * 0.52 * flicker, 0, Math.PI * 2);
+  context.fill();
   context.fillStyle = '#ffffff';
   context.beginPath();
-  context.arc(player.x, player.y, radius * 0.38 * flicker, 0, Math.PI * 2);
+  context.arc(player.x, player.y, radius * 0.26 * flicker, 0, Math.PI * 2);
   context.fill();
 
-  // The trail of the wick, so its movement reads.
+  // The trail of the wick, so its movement reads. It is drawn as two thin
+  // streaks, a split tail, so the wick never looks like a solid shape.
   context.strokeStyle = P.playerCore;
-  context.globalAlpha = 0.4;
+  context.globalAlpha = 0.45;
   context.lineWidth = 2;
   context.beginPath();
   context.moveTo(player.x, player.y);
-  context.lineTo(player.x - Math.cos(heading) * 26, player.y - Math.sin(heading) * 26);
+  context.lineTo(
+    player.x - Math.cos(heading + 0.5) * 30,
+    player.y - Math.sin(heading + 0.5) * 30,
+  );
+  context.moveTo(player.x, player.y);
+  context.lineTo(
+    player.x - Math.cos(heading - 0.5) * 30,
+    player.y - Math.sin(heading - 0.5) * 30,
+  );
   context.stroke();
   context.globalAlpha = 1;
 
   if (game.shieldTime > 0) {
-    // A dashed ring, so the shield never reads as one of the ember halos.
+    // The shield, raised: a bright dashed ring of its own, so it never reads
+    // as one of the ember halos. It is the wick's light turned outward.
     context.strokeStyle = P.shield;
-    context.lineWidth = 3;
-    context.setLineDash([9, 7]);
-    context.lineDashOffset = -game.time * 40;
+    context.globalAlpha = 1;
+    context.lineWidth = 5;
+    context.setLineDash([14, 10]);
+    context.lineDashOffset = -game.time * 60;
     context.beginPath();
     context.arc(player.x, player.y, CONFIG.shield.radius, 0, Math.PI * 2);
     context.stroke();
     context.setLineDash([]);
+    // The light the shield throws off.
+    context.globalAlpha = 0.26;
+    context.fillStyle = P.shield;
+    context.beginPath();
+    context.arc(player.x, player.y, CONFIG.shield.radius, 0, Math.PI * 2);
+    context.fill();
+    context.globalAlpha = 0.6;
+    context.strokeStyle = '#ffffff';
+    context.lineWidth = 1.5;
+    context.beginPath();
+    context.arc(player.x, player.y, CONFIG.shield.radius - 4, 0, Math.PI * 2);
+    context.stroke();
+    context.globalAlpha = 1;
   }
   context.restore();
 }
 
 /** Draw the whole night: the field and everything standing on it. */
-export function drawScene(context, game) {
+export function drawScene(context, game, options = {}) {
   context.save();
   if (game.shake > 0.2) {
     const offset = game.shake;
@@ -356,11 +486,13 @@ export function drawScene(context, game) {
     );
   }
   drawBackground(context, game);
+  drawThreatLines(context, game);
   for (const mote of game.motes) drawMote(context, mote);
   for (const ember of game.embers) drawEmber(context, ember);
+  for (const flash of game.flashes) drawFlash(context, flash);
   for (const spark of game.sparks) drawSpark(context, spark);
   for (const burst of game.bursts) drawBurst(context, burst);
-  drawPlayer(context, game);
+  if (options.hidePlayer !== true) drawPlayer(context, game);
   context.restore();
 
   if (game.flash > 0) {
