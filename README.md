@@ -8,8 +8,9 @@ Emberwake is a top-down survival game about holding a lantern through eight
 waves of night. You steer a small wick of light; embers are drawn to it and
 close in, and anything that reaches you puts your flame out. Gather the light
 motes for charge, spend it on a core burst that snuffs a ring of embers at
-once, and raise a shield when they get too close. Every wave runs shorter than
-the last, and every wave is harder. Hold all eight and dawn breaks.
+once, and raise a shield when they get too close. Between waves the night
+offers you three boons and you take one. Every wave runs shorter than the
+last, and every wave is harder. Hold all eight and dawn breaks.
 
 ## How to play
 
@@ -18,6 +19,7 @@ the last, and every wave is harder. Hold all eight and dawn breaks.
 | `W` `A` `S` `D` / arrow keys | steer the wick |
 | `Space` | core burst — snuffs every ember inside the ring, costs charge |
 | `Shift` | shield — burns whatever touches it for a moment, costs charge |
+| `1` `2` `3` | take one of the three boons offered between waves |
 | `R` | start another night from the end screen |
 
 Collect motes to fill the core, and snuff embers in quick succession to build
@@ -25,7 +27,13 @@ the combo multiplier — a burst that takes three embers at once is worth three
 times what three separate ones are. The three kinds of ember are told apart by
 shape: a **cinder** is a four-pointed shard, a **coal** is a heavy cracked
 hexagon that takes three hits and breaks into two cinders, and a **spark** is a
-thin fast comet.
+thin fast comet. They are violet and magenta against the night; the wick is
+the one warm thing on the field.
+
+The boons change how the wick plays: a wider burst, a faster shield, a core
+that fills quicker, a cheaper burst, slower embers that score more, a wick
+that turns faster, a longer reach for motes, or one more life. Which one you
+take is the difference between a night you hold and one you do not.
 
 Everything is drawn in code: there are no images, no fonts and no audio files,
 so the game is a handful of ES modules and runs offline from any static server.
@@ -54,6 +62,7 @@ mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
 | `game/index.html` | the page the browser opens |
 | `game/src/config.js` | every number the game balances on |
 | `game/src/entities.js` | what the player, embers, motes and sparks are |
+| `game/src/boons.js` | the things you can carry between waves |
 | `game/src/game.js` | the rules: movement, waves, scoring, collision |
 | `game/src/render.js` | the field and the things on it |
 | `game/src/hud.js` | the score, the wave, the charge and the two abilities |
