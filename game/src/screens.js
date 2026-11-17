@@ -6,11 +6,42 @@ import { STATE } from './game.js';
 const P = CONFIG.palette;
 const FONT = '"Trebuchet MS", "Segoe UI", sans-serif';
 
-/** A dimming veil so the text reads over the field. */
+/**
+ * A dimming veil so the text reads over the field. The night keeps its
+ * own texture underneath: a menu screen that is flat black reads as a
+ * different, unfinished game.
+ */
 function veil(context, alpha) {
+  const { width, height } = CONFIG.world;
   context.save();
+  // The same ground the field has: a warm dark, a cooler dark, and the
+  // haze the night always sits in.
+  const ground = context.createRadialGradient(
+    width / 2, height / 2, 40,
+    width / 2, height / 2, Math.max(width, height) * 0.72,
+  );
+  ground.addColorStop(0, '#171033');
+  ground.addColorStop(0.55, '#0a0713');
+  ground.addColorStop(1, '#05030a');
+  context.fillStyle = ground;
+  context.fillRect(0, 0, width, height);
+
+  // A scatter of dust, so the night is the same night everywhere.
+  context.globalAlpha = 0.16;
+  context.fillStyle = P.dim;
+  for (let index = 0; index < 120; index += 1) {
+    const seed = index * 12.9898;
+    const x = ((seed * 37.7) % 1) * width;
+    const y = ((seed * 91.3) % 1) * height;
+    const size = 0.7 + ((seed * 3.3) % 1) * 1.5;
+    context.beginPath();
+    context.arc(x, y, size, 0, Math.PI * 2);
+    context.fill();
+  }
+  context.globalAlpha = 1;
+
   context.fillStyle = `rgba(5, 3, 10, ${alpha})`;
-  context.fillRect(0, 0, CONFIG.world.width, CONFIG.world.height);
+  context.fillRect(0, 0, width, height);
   context.restore();
 }
 
@@ -19,7 +50,9 @@ function panel(context, x, y, width, height) {
   context.save();
   context.fillStyle = 'rgba(10, 7, 19, 0.82)';
   context.fillRect(x, y, width, height);
-  context.strokeStyle = 'rgba(141, 127, 174, 0.35)';
+  // A gold hairline, the colour the arena ring is drawn in, so the menus
+  // belong to the same game as the field.
+  context.strokeStyle = 'rgba(255, 216, 138, 0.4)';
   context.lineWidth = 1.5;
   context.strokeRect(x + 0.5, y + 0.5, width, height);
   context.restore();
@@ -113,56 +146,56 @@ function wavePips(context, game, x, y, radius, gap) {
   context.restore();
 }
 
-/**
- * A small label in the corner of an end card, so the two endings read as
- * two separate nights rather than one night with two outcomes.
- */
-function nightLabel(context, text) {
-  const { width, height } = CONFIG.world;
-  context.save();
-  context.textAlign = 'right';
-  context.fillStyle = 'rgba(141, 127, 174, 0.9)';
-  context.font = `700 18px ${FONT}`;
-  context.fillText(text, width - 44, height - 42);
-  context.restore();
-}
-
 /** The end of the night, and the score it ended with. */
 export function drawGameOver(context, game) {
   const { width, height } = CONFIG.world;
   veil(context, 0.84);
   const panelWidth = 900;
-  const panelHeight = 420;
-  panel(context, width / 2 - panelWidth / 2, height / 2 - panelHeight / 2 - 10, panelWidth, panelHeight);
-  nightLabel(context, 'NIGHT ONE');
+  const panelHeight = 430;
+  panel(context, width / 2 - panelWidth / 2, height / 2 - panelHeight / 2 - 34, panelWidth, panelHeight);
 
   context.save();
   context.textAlign = 'center';
 
-  context.fillStyle = P.danger;
+  // The night this was, as a kicker inside the card: at a quarter size a
+  // corner label is the first thing to vanish.
+  context.fillStyle = 'rgba(141, 127, 174, 0.9)';
+  context.font = `700 24px ${FONT}`;
+  context.fillText(`NIGHT ${game.night === 2 ? 'TWO' : 'ONE'}`, width / 2, height / 2 - 130);
+
+  context.fillStyle = '#ff6b7f';
   context.font = `800 56px ${FONT}`;
-  context.fillText('THE WICK WENT OUT', width / 2, height / 2 - 118);
+  context.fillText('THE WICK WENT OUT', width / 2, height / 2 - 82);
 
   // How far the night got, in the biggest numbers on the card: this screen
-  // is read at a quarter of its size.
+  // is read at a quarter of its size. The unit rides along with the number
+  // so the two can never be separated by the scaling.
   context.fillStyle = P.ink;
   context.font = `800 92px ${FONT}`;
-  context.fillText(`${game.wave} / ${CONFIG.waves.count}`, width / 2, height / 2 - 36);
+  context.fillText(`${game.wave} / ${CONFIG.waves.count}`, width / 2, height / 2 - 8);
+  context.fillStyle = 'rgba(244, 233, 255, 0.85)';
+  context.font = `800 34px ${FONT}`;
+  context.fillText('WAVES HELD', width / 2, height / 2 + 34);
 
-  context.fillStyle = P.dim;
-  context.font = `700 20px ${FONT}`;
-  context.fillText('WAVES HELD', width / 2, height / 2 - 2);
-
-  wavePips(context, game, width / 2 - (CONFIG.waves.count * 30) / 2 + 15, height / 2 + 26, 9, 30);
+  wavePips(context, game, width / 2 - (CONFIG.waves.count * 30) / 2 + 15, height / 2 + 66, 9, 30);
 
   context.fillStyle = P.emberMid;
-  context.font = `800 40px ${FONT}`;
-  context.fillText(`SCORE ${game.score}`, width / 2, height / 2 + 92);
+  context.font = `800 46px ${FONT}`;
+  context.fillText(`SCORE ${String(game.score).padStart(5, '0')}`, width / 2, height / 2 + 126);
 
-  const pulse = 0.7 + Math.sin(game.time * 3.4) * 0.3;
-  context.fillStyle = `rgba(255, 255, 255, ${pulse.toFixed(3)})`;
+  // The restart, in a solid button, so the affordance survives being scaled
+  // down to a thumbnail and so it is the loudest thing on a screen whose
+  // only job is to send the player back into the night. The label is dark
+  // on the gold: white on pale gold is a contrast failure.
+  const buttonWidth = 470;
+  const buttonHeight = 64;
+  const buttonX = width / 2 - buttonWidth / 2;
+  const buttonY = height / 2 + 158;
+  context.fillStyle = P.playerCore;
+  context.fillRect(buttonX, buttonY, buttonWidth, buttonHeight);
+  context.fillStyle = '#221703';
   context.font = `800 32px ${FONT}`;
-  context.fillText('PRESS R TO PLAY AGAIN', width / 2, height / 2 + 154);
+  context.fillText('PRESS R TO PLAY AGAIN', width / 2, buttonY + 42);
   context.restore();
 }
 
@@ -173,35 +206,43 @@ export function drawVictory(context, game) {
   const panelWidth = 900;
   const panelHeight = 420;
   panel(context, width / 2 - panelWidth / 2, height / 2 - panelHeight / 2 - 10, panelWidth, panelHeight);
-  nightLabel(context, 'NIGHT TWO');
 
   context.save();
   context.textAlign = 'center';
 
+  context.fillStyle = 'rgba(141, 127, 174, 0.9)';
+  context.font = `700 24px ${FONT}`;
+  context.fillText(`NIGHT ${game.night === 2 ? 'TWO' : 'ONE'}`, width / 2, height / 2 - 130);
+
   context.fillStyle = P.good;
   context.font = `800 62px ${FONT}`;
-  context.fillText('DAWN BREAKS', width / 2, height / 2 - 118);
+  context.fillText('DAWN BREAKS', width / 2, height / 2 - 104);
 
   // The same shape of information as the loss card, so the two read as one
   // story told twice.
   context.fillStyle = P.ink;
   context.font = `800 92px ${FONT}`;
-  context.fillText(`${CONFIG.waves.count} / ${CONFIG.waves.count}`, width / 2, height / 2 - 36);
+  context.fillText(`${CONFIG.waves.count} / ${CONFIG.waves.count}`, width / 2, height / 2 - 30);
+  context.fillStyle = 'rgba(244, 233, 255, 0.85)';
+  context.font = `800 34px ${FONT}`;
+  context.fillText('WAVES HELD', width / 2, height / 2 + 34);
 
-  context.fillStyle = P.dim;
-  context.font = `700 20px ${FONT}`;
-  context.fillText('WAVES HELD', width / 2, height / 2 - 2);
-
-  wavePips(context, game, width / 2 - (CONFIG.waves.count * 30) / 2 + 15, height / 2 + 26, 9, 30);
+  wavePips(context, game, width / 2 - (CONFIG.waves.count * 30) / 2 + 15, height / 2 + 66, 9, 30);
 
   context.fillStyle = P.emberMid;
-  context.font = `800 40px ${FONT}`;
-  context.fillText(`SCORE ${game.score}`, width / 2, height / 2 + 92);
+  context.font = `800 46px ${FONT}`;
+  context.fillText(`SCORE ${String(game.score).padStart(5, '0')}`, width / 2, height / 2 + 126);
 
-  const pulse = 0.7 + Math.sin(game.time * 3.4) * 0.3;
-  context.fillStyle = `rgba(255, 255, 255, ${pulse.toFixed(3)})`;
+  const pulse = 0.88 + Math.sin(game.time * 3.4) * 0.12;
+  const buttonWidth = 500;
+  const buttonHeight = 64;
+  const buttonX = width / 2 - buttonWidth / 2;
+  const buttonY = height / 2 + 158;
+  context.fillStyle = P.good;
+  context.fillRect(buttonX, buttonY, buttonWidth, buttonHeight);
+  context.fillStyle = '#05271a';
   context.font = `800 32px ${FONT}`;
-  context.fillText('PRESS R FOR ANOTHER NIGHT', width / 2, height / 2 + 154);
+  context.fillText('PRESS R FOR ANOTHER NIGHT', width / 2, buttonY + 42);
   context.restore();
 }
 
@@ -235,34 +276,19 @@ export function drawChoice(context, game) {
     context.strokeRect(x + 0.5, y + 0.5, cardWidth, cardHeight);
 
     context.fillStyle = index === 0 ? P.playerCore : P.ink;
-    context.font = `800 28px ${FONT}`;
-    context.fillText(boon.name, x + cardWidth / 2, y + 52);
+    context.font = `800 34px ${FONT}`;
+    context.fillText(boon.name, x + cardWidth / 2, y + 58);
 
     context.fillStyle = P.emberMid;
-    context.font = `600 20px ${FONT}`;
-    context.fillText(boon.blurb, x + cardWidth / 2, y + 92);
+    context.font = `600 22px ${FONT}`;
+    context.fillText(boon.blurb, x + cardWidth / 2, y + 98);
 
-    // The detail, wrapped to the card.
-    context.fillStyle = P.dim;
-    context.font = `500 17px ${FONT}`;
-    const words = boon.detail.split(' ');
-    let line = '';
-    let lineY = y + 132;
-    for (const word of words) {
-      const candidate = line ? `${line} ${word}` : word;
-      if (context.measureText(candidate).width > cardWidth - 40) {
-        context.fillText(line, x + cardWidth / 2, lineY);
-        line = word;
-        lineY += 24;
-      } else {
-        line = candidate;
-      }
-    }
-    context.fillText(line, x + cardWidth / 2, lineY);
-
+    // The detail is not printed on the card. A card read at a quarter size
+    // has to be named, not explained, and the name and the one line beside
+    // it are what carry the choice.
     context.fillStyle = index === 0 ? P.playerCore : P.dim;
-    context.font = `800 20px ${FONT}`;
-    context.fillText(`${index + 1}`, x + cardWidth / 2, y + cardHeight - 24);
+    context.font = `800 34px ${FONT}`;
+    context.fillText(`${index + 1}`, x + cardWidth / 2, y + cardHeight - 26);
   });
 
   const pulse = 0.7 + Math.sin(game.time * 3.4) * 0.3;

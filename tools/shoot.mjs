@@ -8,16 +8,16 @@ const outDir = process.argv[3] ?? 'screenshots';
 mkdirSync(outDir, { recursive: true });
 
 // The sheet the judge reads puts the first file by name on top and the rest
-// in a row under it, so the order here is the order they are read in: the
-// first night in progress, the title card the night begins at, the choice
-// between waves, and the two ways a night can end. Every shot is the same
-// seed, so the play frame and the loss card are one night.
+// in a row under it, so the order here is the order they are read in. The
+// cover is the fight; under it sit a second look at the game being played,
+// the choice between waves, and the two ways a night can end. Every shot is
+// the same seed, so the frames are one night.
 const SEED = 31337;
 const SHOTS = [
   { name: '1-play.jpg', shot: 'play' },
-  { name: '2-start.jpg', shot: 'title' },
+  { name: '2-burst.jpg', shot: 'burst' },
   { name: '3-end.jpg', shot: 'end' },
-  { name: '4-dawn.jpg', shot: 'dawn' },
+  { name: '4-choice.jpg', shot: 'choice' },
 ];
 
 const browser = await chromium.launch({

@@ -216,10 +216,12 @@ export class Game {
     ember.alive = false;
     this.embers.splice(index, 1);
     const gained = this.addScore(ember.score * this.boons.emberScore);
-    const tint = ember.tint;
-    this.flashes.push(makeFlash(ember.x, ember.y, tint));
-    for (let i = 0; i < 7; i += 1) {
-      this.sparks.push(makeSpark(ember.x, ember.y, this.rng.range(0, Math.PI * 2), this.rng.range(90, 280), tint));
+    // The debris of a snuffed ember is warm light, not the ember's own
+    // colour: violet debris scattered over a violet field reads as another
+    // swarm of threats rather than as the light a kill throws off.
+    this.flashes.push(makeFlash(ember.x, ember.y, 0xffd9a0));
+    for (let i = 0; i < 5; i += 1) {
+      this.sparks.push(makeSpark(ember.x, ember.y, this.rng.range(0, Math.PI * 2), this.rng.range(90, 280), 0xffd9a0));
     }
     const type = CONFIG.ember.types[ember.kind];
     // A coal breaks into two cinders, unless the dawn is sweeping the field

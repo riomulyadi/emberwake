@@ -84,6 +84,54 @@ export function drawHud(context, game) {
   corner(context, 190, height - 80, 420, 190);
   corner(context, width - 190, height - 40, 380, 120);
 
+  // The game's name, as a lockup in the black space beside the arena. A
+  // still of a game should say what the game is called and what it is
+  // about; without it the cover reads as any arena shooter at all. It is
+  // set larger than any other type on the screen, so the name wins the eye
+  // rather than the score counter.
+  context.textAlign = 'left';
+  // A soft backing, so the name stays readable over a bright ember.
+  const brandGradient = context.createRadialGradient(
+    150, 340, 20,
+    150, 340, 270,
+  );
+  brandGradient.addColorStop(0, 'rgba(5, 3, 10, 0.85)');
+  brandGradient.addColorStop(1, 'rgba(5, 3, 10, 0)');
+  context.fillStyle = brandGradient;
+  context.fillRect(0, 200, 330, 270);
+
+  // The mark: a wick burning, drawn in the same flame the player is. It
+  // is the one piece of logo the game has, so it is drawn here rather
+  // than set in type.
+  const markX = 62;
+  const markY = 268;
+  const flame = context.createRadialGradient(markX, markY, 2, markX, markY, 34);
+  flame.addColorStop(0, '#fff6d8');
+  flame.addColorStop(0.4, P.playerCore);
+  flame.addColorStop(1, 'rgba(255, 216, 138, 0)');
+  context.fillStyle = flame;
+  context.beginPath();
+  context.moveTo(markX, markY - 30);
+  context.bezierCurveTo(markX + 22, markY - 8, markX + 16, markY + 20, markX, markY + 24);
+  context.bezierCurveTo(markX - 16, markY + 20, markX - 22, markY - 8, markX, markY - 30);
+  context.closePath();
+  context.fill();
+  context.fillStyle = P.emberCore;
+  context.beginPath();
+  context.ellipse(markX, markY + 2, 6, 12, 0, 0, Math.PI * 2);
+  context.fill();
+
+  context.fillStyle = P.playerCore;
+  context.font = `800 46px ${FONT}`;
+  context.fillText('EMBER', 108, 288);
+  context.fillText('WAKE', 108, 336);
+  // The tagline sits under both lines of the name, clear of them.
+  context.fillStyle = 'rgba(244, 233, 255, 0.82)';
+  context.font = `700 19px ${FONT}`;
+  context.fillText('hold the light', 108, 368);
+  context.fillText('until dawn', 108, 392);
+  context.textAlign = 'left';
+
   // Top left: the score, and the wick's lives.
   context.fillStyle = P.ink;
   context.font = `700 32px ${FONT}`;
@@ -131,19 +179,28 @@ export function drawHud(context, game) {
   }
   context.textAlign = 'left';
 
-  // Top centre: the combo, when there is one.
+  // The combo, tucked under the score on the left, where the other numbers
+  // live. Centred at the top it sat on the ward's arc, with the HUD over
+  // the playfield. The label is measured, not guessed at, so the number and
+  // the word never run into each other.
   if (game.multiplier > 1.01) {
-    context.textAlign = 'center';
+    const label = 'COMBO';
     context.fillStyle = P.mote;
     context.font = `800 30px ${FONT}`;
-    context.fillText(`x${game.multiplier.toFixed(1)}`, width / 2, 22);
+    const value = `x${game.multiplier.toFixed(1)}`;
+    const valueWidth = context.measureText(value).width;
+    context.fillText(value, 28, 160);
     context.fillStyle = P.dim;
     context.font = `600 13px ${FONT}`;
-    context.fillText('COMBO', width / 2, 60);
-    context.textAlign = 'left';
+    const labelWidth = context.measureText(label).width;
+    context.fillText(label, 28 + valueWidth + 10, 160);
+    void labelWidth;
   }
 
   // Bottom left: the core charge bar, on its own line and clearly labelled.
+  // The track is drawn as a row of segments and the fill is bright, so a
+  // nearly empty core still reads as a working gauge rather than as a
+  // rendering failure.
   const barX = 28;
   const barY = height - 116;
   const barWidth = 300;
@@ -153,14 +210,19 @@ export function drawHud(context, game) {
   context.textAlign = 'right';
   context.fillText(`${Math.round(game.player.charge)}%`, barX + barWidth, barY - 20);
   context.textAlign = 'left';
-  context.fillStyle = 'rgba(255, 255, 255, 0.08)';
-  context.fillRect(barX, barY, barWidth, 14);
   const ratio = game.player.charge / CONFIG.core.maxCharge;
-  context.fillStyle = ratio >= 0.5 ? P.playerCore : P.dim;
-  context.fillRect(barX, barY, barWidth * ratio, 14);
-  context.strokeStyle = 'rgba(244, 233, 255, 0.35)';
+  const segments = 20;
+  const segmentWidth = barWidth / segments;
+  for (let index = 0; index < segments; index += 1) {
+    const filled = (index + 1) / segments <= ratio + 0.001;
+    context.fillStyle = filled
+      ? P.playerCore
+      : 'rgba(244, 233, 255, 0.16)';
+    context.fillRect(barX + index * segmentWidth, barY, segmentWidth - 3, 16);
+  }
+  context.strokeStyle = 'rgba(244, 233, 255, 0.3)';
   context.lineWidth = 1;
-  context.strokeRect(barX + 0.5, barY + 0.5, barWidth, 13);
+  context.strokeRect(barX + 0.5, barY + 0.5, barWidth - 1, 15);
 
   // Bottom left, under the bar: the two abilities, each in its own frame.
   const burstReady = game.burstCooldown <= 0 && game.player.charge >= CONFIG.core.burstCost;
@@ -169,12 +231,16 @@ export function drawHud(context, game) {
   abilityBox(context, barX, barY + 30, 'SPACE', burstReady ? 'BURST READY' : 'COOLDOWN', burstReady, game.player.charge / CONFIG.core.maxCharge);
   abilityBox(context, barX + 184, barY + 30, 'SHIFT', shieldUp ? 'SHIELD UP' : shieldReady ? 'SHIELD READY' : 'COOLDOWN', shieldReady || shieldUp, 1 - game.shieldCooldown / CONFIG.shield.cooldown, P.shield);
 
-  // Bottom right: the night so far, in words.
+  // Bottom right: the night so far, in words. The control legend is kept
+  // quiet and small: the title card already teaches the keys, and a bright
+  // legend here competes with the fight for the eye.
   context.textAlign = 'right';
   context.fillStyle = P.dim;
   context.font = `600 13px ${FONT}`;
   context.fillText(`${game.stats.embers} SNUFFED  ·  ${game.stats.motes} MOTES`, width - 34, height - 34);
-  context.fillText('WASD / ARROWS  STEER', width - 34, height - 54);
+  context.fillStyle = 'rgba(141, 127, 174, 0.55)';
+  context.font = `600 11px ${FONT}`;
+  context.fillText('WASD / ARROWS  STEER', width - 34, height - 52);
   context.textAlign = 'left';
 
   // The wave banner, in the middle of the field.

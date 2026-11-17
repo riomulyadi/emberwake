@@ -94,8 +94,8 @@ export function makeFlash(x, y, tint) {
   return {
     x,
     y,
-    radius: 30,
-    max: 30,
+    radius: 22,
+    max: 22,
     life: 0.3,
     maxLife: 0.3,
     tint,
